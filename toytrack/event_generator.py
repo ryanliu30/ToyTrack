@@ -82,25 +82,15 @@ class EventGenerator:
         The particle gun to use to generate particles.
     detector: Detector
         The detector to use to generate hits.
-    num_particles: float, list
-        The number of particles to generate. This can be specified in three ways:
-        - A single float: This will generate a fixed number of particles.
-        - A pair of floats: This will generate a random number of particles with a uniform distribution.
-        - A list of three floats: This will generate a random number of particles. The third entry of the list
-        is the distribution type (uniform, normal or poisson), and the first two entries are the parameters of the
-        distribution. For example, if the third entry is 'uniform', then the first two entries are the minimum and
-        maximum of the uniform distribution. If the third entry is 'normal', then the first two entries are the mean
-        and standard deviation of the normal distribution. If the third entry is 'poisson', then the first two entries
-        are the mean and standard deviation of the poisson distribution.
     noise: float, list
         The amount of noise to add to the hits. This can be specified in three ways as for num_particles.
         If the values are given as non-zero integers, then the noise is added as a fixed number of hits.
         If the values are given as floats between 0 and 1, then the noise is added as a fraction of the number of non-noise hits.
     """
 
-    def __init__(self, particle_gun: ParticleGun, 
+    def __init__(self, 
+                    particle_gun: Union[ParticleGun, List[ParticleGun]], 
                     detector: Detector, 
-                    num_particles: Union[float, List[float], List[Union[float, str]]],
                     noise: Union[float, List[float], List[Union[float, str]], int, List[int], List[Union[int, str]]] = None
                  ):
         """
@@ -108,18 +98,20 @@ class EventGenerator:
         """
         self.particle_gun = particle_gun
         self.detector = detector
-        self.num_particles = num_particles
         self.noise = noise
 
     def generate_event(self):
         """
         Generate an event based on the initialized parameters.
         """
-        # Generate the number of particles
-        num_particles = int(self._generate_value(self.num_particles))
 
         # Generate the particles
-        particles = self.particle_gun.generate_particles(num_particles)
+        if isinstance(self.particle_gun, list):
+            particles = pd.concat([gun.generate_particles() for gun in self.particle_gun], ignore_index=True)
+        else:
+            particles = self.particle_gun.generate_particles()
+
+        particles["particle_id"] = particles.index
 
         # Generate the hits
         hits = self.detector.generate_hits(particles)
@@ -177,7 +169,7 @@ class EventGenerator:
 
         # Sort the hits by particle ID and then by R
         merged_hits = non_noise_hits.merge(particles, on='particle_id')
-        merged_hits['R'] = np.sqrt((merged_hits["x"] - merged_hits["vx"])**2 + (merged_hits["y"] - merged_hits["vy"])**2)
+        merged_hits['R'] = np.hypot(merged_hits["x"] - merged_hits["vx"], merged_hits["y"] - merged_hits["vy"])
         sorted_hits = merged_hits.sort_values(by=['particle_id', 'R'])
 
         # Get the edges of the tracks

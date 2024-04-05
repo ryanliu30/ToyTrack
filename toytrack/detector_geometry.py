@@ -180,8 +180,7 @@ class Detector:
         })
 
         # Mix together hits and noise randomly
-        hits_df = pd.concat([hits_df, noise_df])
-        hits_df = hits_df.sample(frac=1, random_state=42).reset_index(drop=True)
+        hits_df = pd.concat([hits_df, noise_df]).reset_index(drop=True)
 
         return hits_df
 
@@ -297,14 +296,14 @@ class Detector:
         y0 = df['vy'] - df['charge'] * r * np.sin(df['pphi'])
 
         # distance between circles R
-        R = np.sqrt(x0**2 + y0**2)
+        R = np.hypot(x0, y0)
 
         a = (r**2 - df['radius']**2) / (2 * R)
-        b1 = np.sqrt(
-            (r**2 + df['radius']**2)/2 - 
-            (r**2 - df['radius']**2)**2 / (4 * R**2) -
-            R**2 / 4
-            )
+        b1 = np.sqrt(np.clip(
+            (r**2 + df['radius']**2) / 2 - 
+            (r**2 - df['radius']**2) **2 / (4 * R**2) -
+            R ** 2 / 4
+        , 0, None))
         b2 = -b1
 
         # Calculate the intersection points
